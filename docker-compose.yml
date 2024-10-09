@@ -1,0 +1,27 @@
+version: '3'
+services:
+  master:
+    build:
+      context: ./master
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - secondary
+    networks:
+      replog-network:
+        aliases:
+          - master
+  secondary:
+    build:
+      context: ./secondary
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+    networks:
+      replog-network:
+        aliases:
+          - secondary
+networks:
+  replog-network:
+    driver: bridge

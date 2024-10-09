@@ -12,7 +12,7 @@
 
     <modules>
         <module>master</module>
-        <!-- Include other modules like 'secondary' here in the future -->
+        <module>common</module>
     </modules>
 
     <properties>

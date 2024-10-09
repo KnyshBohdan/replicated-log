@@ -33,7 +33,7 @@ public class MessageController {
 
         replicateToSecondaries(message);
 
-        return ResponseEntity.ok("Message received and replicated");
+        return ResponseEntity.ok("Message received and replicated \n");
     }
 
     @GetMapping("/messages")

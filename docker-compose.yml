@@ -7,21 +7,34 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - secondary
+      - secondary1
+      - secondary2
     networks:
       replog-network:
         aliases:
           - master
-  secondary:
+  secondary1:
     build:
       context: ./secondary
       dockerfile: Dockerfile
+    command: ["50051"]
     ports:
       - "50051:50051"
     networks:
       replog-network:
         aliases:
-          - secondary
+          - secondary1
+  secondary2:
+    build:
+      context: ./secondary
+      dockerfile: Dockerfile
+    command: ["50052"]
+    ports:
+      - "50052:50052"
+    networks:
+      replog-network:
+        aliases:
+          - secondary2
 networks:
   replog-network:
     driver: bridge

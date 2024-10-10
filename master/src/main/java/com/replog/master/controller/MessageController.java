@@ -1,6 +1,9 @@
 package com.replog.master.controller;
 
 import com.replog.master.model.Message;
+import com.replog.master.discovery.SecondaryServerDiscovery;
+import com.replog.master.model.SecondaryServer;
+import com.replog.master.model.SecondaryServers;
 import com.replog.proto.MessageProto;
 import com.replog.proto.MessageServiceGrpc;
 import io.grpc.ManagedChannel;
@@ -20,11 +23,11 @@ public class MessageController {
 
     private List<Message> messages = new ArrayList<>();
 
-    @Value("${secondary.host}")
-    private String secondaryHost;
+    private final SecondaryServerDiscovery secondaryServerDiscovery;
 
-    @Value("${secondary.port}")
-    private int secondaryPort;
+    public MessageController(SecondaryServerDiscovery secondaryServerDiscovery) {
+        this.secondaryServerDiscovery = secondaryServerDiscovery;
+    }
 
     @PostMapping("/messages")
     public ResponseEntity<String> addMessage(@RequestBody Message message) {
@@ -45,28 +48,31 @@ public class MessageController {
     private void replicateToSecondaries(Message message) {
         logger.info("Replicating message to secondaries: {}", message.getContent());
 
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(secondaryHost, secondaryPort)
-                .usePlaintext()
-                .build();
-
-        try {
-            MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(channel);
-
-            MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
-                    .setContent(message.getContent())
+        SecondaryServers secondaryServers = secondaryServerDiscovery.getSecondaryServers();
+        for (SecondaryServer secondaryServer : secondaryServers.getServers()) {
+            ManagedChannel channel = ManagedChannelBuilder.forAddress(secondaryServer.getHost(), secondaryServer.getPort())
+                    .usePlaintext()
                     .build();
 
-            MessageProto.Ack ack = stub.replicateMessage(grpcMessage);
+            try {
+                MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(channel);
 
-            if (ack.getSuccess()) {
-                logger.info("Received ACK from secondary");
-            } else {
-                logger.warn("Secondary failed to replicate message");
+                MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
+                        .setContent(message.getContent())
+                        .build();
+
+                MessageProto.Ack ack = stub.replicateMessage(grpcMessage);
+
+                if (ack.getSuccess()) {
+                    logger.info("Received ACK from secondary");
+                } else {
+                    logger.warn("Secondary failed to replicate message");
+                }
+            } catch (Exception e) {
+                logger.error("Error during replication to secondary", e);
+            } finally {
+                channel.shutdown();
             }
-        } catch (Exception e) {
-            logger.error("Error during replication to secondary", e);
-        } finally {
-            channel.shutdown();
         }
 
         logger.info("Replication to secondaries completed");

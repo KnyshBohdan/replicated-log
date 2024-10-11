@@ -13,28 +13,35 @@ services:
       replog-network:
         aliases:
           - master
+
   secondary1:
     build:
       context: ./secondary
       dockerfile: Dockerfile
-    command: ["50051"]
+    environment:
+      - grpc.port=50051
     ports:
       - "50051:50051"
+      - "8081:8080"  # If you need HTTP access
     networks:
       replog-network:
         aliases:
           - secondary1
+
   secondary2:
     build:
       context: ./secondary
       dockerfile: Dockerfile
-    command: ["50052"]
+    environment:
+      - grpc.port=50052
     ports:
       - "50052:50052"
+      - "8082:8080"  # If you need HTTP access
     networks:
       replog-network:
         aliases:
           - secondary2
+
 networks:
   replog-network:
     driver: bridge

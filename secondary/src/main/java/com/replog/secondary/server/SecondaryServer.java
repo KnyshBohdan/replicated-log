@@ -1,18 +1,26 @@
-package com.replog.secondary;
+package com.replog.secondary.server;
 
+import com.replog.secondary.processor.SecondaryMessageProcessor;
+import com.replog.secondary.services.impl.MessageServiceImpl;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
+@Component
 public class SecondaryServer {
 
     private static final Logger logger = LoggerFactory.getLogger(SecondaryServer.class);
     private Server server;
 
-    private void start(int port) throws Exception {
+    @Autowired
+    private SecondaryMessageProcessor messageProcessor;
+
+    public void start(int port) throws Exception {
         server = ServerBuilder.forPort(port)
-                .addService(new MessageServiceImpl())
+                .addService(new MessageServiceImpl(messageProcessor))
                 .build()
                 .start();
         logger.info("Secondary server started, listening on port {}", port);
@@ -24,25 +32,15 @@ public class SecondaryServer {
         }));
     }
 
-    private void stop() {
+    public void stop() {
         if (server != null) {
             server.shutdown();
         }
     }
 
-    private void blockUntilShutdown() throws InterruptedException {
+    public void blockUntilShutdown() throws InterruptedException {
         if (server != null) {
             server.awaitTermination();
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        int port = 50051; // Default port
-        if (args.length > 0) {
-            port = Integer.parseInt(args[0]);
-        }
-        final SecondaryServer server = new SecondaryServer();
-        server.start(port);
-        server.blockUntilShutdown();
     }
 }

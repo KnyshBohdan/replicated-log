@@ -7,21 +7,41 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - secondary
+      - secondary1
+      - secondary2
     networks:
       replog-network:
         aliases:
           - master
-  secondary:
+
+  secondary1:
     build:
       context: ./secondary
       dockerfile: Dockerfile
+    environment:
+      - grpc.port=50051
     ports:
       - "50051:50051"
+      - "8081:8080"  # If you need HTTP access
     networks:
       replog-network:
         aliases:
-          - secondary
+          - secondary1
+
+  secondary2:
+    build:
+      context: ./secondary
+      dockerfile: Dockerfile
+    environment:
+      - grpc.port=50052
+    ports:
+      - "50052:50052"
+      - "8082:8080"  # If you need HTTP access
+    networks:
+      replog-network:
+        aliases:
+          - secondary2
+
 networks:
   replog-network:
     driver: bridge

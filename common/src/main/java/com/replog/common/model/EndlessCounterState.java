@@ -11,6 +11,11 @@ public class EndlessCounterState implements Comparable<EndlessCounterState> {
         this.imaginary = 0.0; // angle 0 degrees
     }
 
+    public EndlessCounterState(EndlessCounterState other) {
+        this.real = other.real;
+        this.imaginary = other.imaginary; // angle 0 degrees
+    }
+
     public EndlessCounterState(double real, double imaginary) {
         this.real = real;
         this.imaginary = imaginary;

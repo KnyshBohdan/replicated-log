@@ -6,25 +6,25 @@ option java_package = "com.replog.proto";
 option java_outer_classname = "MessageProto";
 
 message Heartbeat {
-  string slaveID = 1;            // Unique identifier of slave (length 6)
-  int64 slaveTimestamp = 2;      // Data from nanoTime
-  string status = 3;             // Status, e.g., "WORKING"
+  string slaveID = 1;            // unique identifier of slave (length 6)
+  int64 slaveTimestamp = 2;      // data from nanoTime
+  string status = 3;             // status, e.g., "WORKING"
 }
 
 message Message {
-  string masterID = 1;           // Unique identifier of master (length 6)
-  int64 masterTimestamp = 2;     // Data from nanoTime
-  double msgIDReal = 3;          // Real part of EndlessCounterState
-  double msgIDImg = 4;           // Imaginary part of EndlessCounterState
-  string content = 5;            // Message content
+  string masterID = 1;           // unique identifier of master (length 6)
+  int64 masterTimestamp = 2;     // data from nanoTime
+  double msgIDReal = 3;          // real part of EndlessCounterState
+  double msgIDImg = 4;           // imaginary part of EndlessCounterState
+  string content = 5;            // message content
 }
 
 message Ack {
-  string slaveID = 1;            // Unique identifier of slave (length 6)
-  int64 masterTimestamp = 2;     // Data from nanoTime
-  double msgIDReal = 3;          // Real part of EndlessCounterState
-  double msgIDImg = 4;           // Imaginary part of EndlessCounterState
-  bool success = 5;              // Success status
+  string slaveID = 1;            // unique identifier of slave (length 6)
+  int64 masterTimestamp = 2;     // data from nanoTime
+  double msgIDReal = 3;          // real part of EndlessCounterState
+  double msgIDImg = 4;           // imaginary part of EndlessCounterState
+  bool success = 5;              // success status
 }
 
 service MessageService {

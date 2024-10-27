@@ -1,5 +1,6 @@
 package com.replog.secondary.server;
 
+import com.replog.secondary.config.SecondaryServerConfig;
 import com.replog.secondary.processor.SecondaryMessageProcessor;
 import com.replog.secondary.services.impl.MessageServiceImpl;
 import io.grpc.Server;
@@ -16,14 +17,17 @@ public class SecondaryServer {
     private Server server;
 
     @Autowired
+    private SecondaryServerConfig config;
+
+    @Autowired
     private SecondaryMessageProcessor messageProcessor;
 
     public void start(int port) throws Exception {
         server = ServerBuilder.forPort(port)
-                .addService(new MessageServiceImpl(messageProcessor))
+                .addService(new MessageServiceImpl(messageProcessor, config))
                 .build()
                 .start();
-        logger.info("Secondary server started, listening on port {}", port);
+        logger.info("Secondary server started with ID {}, listening on port {}", config.getSlaveID(), port);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutting down gRPC server");

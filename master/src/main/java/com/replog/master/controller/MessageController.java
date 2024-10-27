@@ -1,6 +1,8 @@
 package com.replog.master.controller;
 
-import com.replog.master.model.Message;
+import com.replog.common.counter.EndlessCounter;
+import com.replog.common.model.EndlessCounterState;
+import com.replog.common.model.Message;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
@@ -15,15 +17,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class MessageController {
 
     private static final Logger logger = LoggerFactory.getLogger(MessageController.class);
 
-    private List<Message> messages = new ArrayList<>();
+    private final List<Message> messages = new ArrayList<>();
 
     private final SecondaryServerDiscovery secondaryServerDiscovery;
+
+    private final String masterID = generateUniqueID();
+    private final EndlessCounter endlessCounter = new EndlessCounter();
+    private final EndlessCounterState endlessCounterState = new EndlessCounterState();
 
     public MessageController(SecondaryServerDiscovery secondaryServerDiscovery) {
         this.secondaryServerDiscovery = secondaryServerDiscovery;
@@ -32,6 +39,11 @@ public class MessageController {
     @PostMapping("/messages")
     public ResponseEntity<String> addMessage(@RequestBody Message message) {
         logger.info("Received POST request with message: {}", message.getContent());
+
+        // Increment the EndlessCounterState for new message IDs
+        synchronized (endlessCounterState) {
+            endlessCounter.increment(endlessCounterState);
+        }
 
         List<String> failedServers = replicateToSecondaries(message);
 
@@ -57,6 +69,16 @@ public class MessageController {
 
         logger.info("Replicating message to secondaries: {}", message.getContent());
 
+        // Get current timestamp and message IDs
+        long masterTimestamp = System.nanoTime();
+        double msgIDReal;
+        double msgIDImg;
+
+        synchronized (endlessCounterState) {
+            msgIDReal = endlessCounterState.getReal();
+            msgIDImg = endlessCounterState.getImaginary();
+        }
+
         SecondaryServers secondaryServers = secondaryServerDiscovery.getSecondaryServers();
         for (SecondaryServer secondaryServer : secondaryServers.getServers()) {
             ManagedChannel channel = ManagedChannelBuilder.forAddress(secondaryServer.getHost(), secondaryServer.getPort())
@@ -67,6 +89,10 @@ public class MessageController {
                 MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(channel);
 
                 MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
+                        .setMasterID(masterID)
+                        .setMasterTimestamp(masterTimestamp)
+                        .setMsgIDReal(msgIDReal)
+                        .setMsgIDImg(msgIDImg)
                         .setContent(message.getContent())
                         .build();
 
@@ -88,5 +114,10 @@ public class MessageController {
 
         logger.info("Replication to secondaries completed");
         return failedServers;
+    }
+
+    private String generateUniqueID() {
+        // Generate a random 6-character alphanumeric string
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
     }
 }

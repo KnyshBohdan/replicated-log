@@ -10,6 +10,7 @@ and the GRPC protocol is used for efficient message transfer between the compone
 - HTTP server for easy communication and message retrieval
 - GRPC protocol for efficient message transfer between components
 - Customizable delay for simulating message processing time
+- Write concern parameters and asynchronous messages sending 
 
 ## Build
 
@@ -40,10 +41,16 @@ This command will create three servers: one Master and two Secondary servers.
 
 ### Posting message
 
+The posting of the messages support the write concern parameters:
+
+* writeConcern = 1 - wait just from master response
+* writeConcern = 2 - wait from master and one secondary
+* writeConcern = 3 - wait from master and all secondaries
+
 To post a message to the Master server, use the following command:
 
 ```shell
-curl -X POST -H "Content-Type: application/json" -d '{"content":"Hello, World!"}' http://localhost:8080/messages
+curl -X POST -H "Content-Type: application/json" -d '{"content":"0 Hello, World!", "writeConcern":1}' http://localhost:8080/messages
 ```
 
 The message will be replicated to the Secondary servers with a configurable delay.
@@ -67,4 +74,46 @@ To retrieve messages from the second Secondary server, use the following command
 
 ```shell
 curl http://localhost:8082/messages
+```
+
+### Example
+
+Here is example:
+
+```shell
+curl -X POST -H "Content-Type: application/json" -d '{"content":"0 Hello, World!", "writeConcern":1}' http://localhost:8080/messages
+curl -X POST -H "Content-Type: application/json" -d '{"content":"1 Hello, World!", "writeConcern":2}' http://localhost:8080/messages
+curl -X POST -H "Content-Type: application/json" -d '{"content":"2 Hello, World!", "writeConcern":3}' http://localhost:8080/messages
+```
+
+After all messages was send, run the get function. You should see something like that:
+
+Input:
+```shell
+curl http://localhost:8080/messages
+```
+
+Output:
+```shell
+Master processed messages: 
+1: 0 Hello, World!
+2: 1 Hello, World!
+3: 2 Hello, World!
+============================
+```
+
+And from secondary:
+
+Input:
+```shell
+curl http://localhost:8081/messages
+```
+
+Output:
+```shell
+Secondary processed messages: 
+1: 0 Hello, World!
+2: 1 Hello, World!
+3: 2 Hello, World!
+============================
 ```

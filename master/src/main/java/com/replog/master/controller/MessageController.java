@@ -3,6 +3,8 @@ package com.replog.master.controller;
 import com.replog.common.counter.EndlessCounter;
 import com.replog.common.model.EndlessCounterState;
 import com.replog.common.model.Message;
+import com.replog.common.model.MessageBuffer;
+import com.replog.master.model.InputMessage;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
@@ -24,7 +26,7 @@ public class MessageController {
 
     private static final Logger logger = LoggerFactory.getLogger(MessageController.class);
 
-    private final List<Message> messages = new ArrayList<>();
+    private final MessageBuffer messagesBuffer = new MessageBuffer();
 
     private final SecondaryServerDiscovery secondaryServerDiscovery;
 
@@ -37,7 +39,7 @@ public class MessageController {
     }
 
     @PostMapping("/messages")
-    public ResponseEntity<String> addMessage(@RequestBody Message message) {
+    public ResponseEntity<String> addMessage(@RequestBody InputMessage message) {
         logger.info("Received POST request with message: {}", message.getContent());
 
         // Increment the EndlessCounterState for new message IDs
@@ -45,10 +47,13 @@ public class MessageController {
             endlessCounter.increment(endlessCounterState);
         }
 
-        List<String> failedServers = replicateToSecondaries(message);
+        Message newMessage = new Message(message.getContent());
+        newMessage.setEndlessCounterState(endlessCounterState);
+
+        List<String> failedServers = replicateToSecondaries(newMessage);
 
         if (failedServers.isEmpty()) {
-            messages.add(message);
+            messagesBuffer.add(newMessage);
             return ResponseEntity.ok("Message received and replicated successfully.\n");
         } else {
             logger.error("Failed to replicate message to the following secondary servers: {}", failedServers);
@@ -61,7 +66,7 @@ public class MessageController {
     @GetMapping("/messages")
     public List<Message> getMessages() {
         logger.info("Received GET request for all messages");
-        return messages;
+        return messagesBuffer.getMessages();
     }
 
     private List<String> replicateToSecondaries(Message message) {
@@ -71,13 +76,6 @@ public class MessageController {
 
         // Get current timestamp and message IDs
         long masterTimestamp = System.nanoTime();
-        double msgIDReal;
-        double msgIDImg;
-
-        synchronized (endlessCounterState) {
-            msgIDReal = endlessCounterState.getReal();
-            msgIDImg = endlessCounterState.getImaginary();
-        }
 
         SecondaryServers secondaryServers = secondaryServerDiscovery.getSecondaryServers();
         for (SecondaryServer secondaryServer : secondaryServers.getServers()) {
@@ -91,8 +89,8 @@ public class MessageController {
                 MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
                         .setMasterID(masterID)
                         .setMasterTimestamp(masterTimestamp)
-                        .setMsgIDReal(msgIDReal)
-                        .setMsgIDImg(msgIDImg)
+                        .setMsgIDReal(message.getEndlessCounterState().getReal())
+                        .setMsgIDImg(message.getEndlessCounterState().getImaginary())
                         .setContent(message.getContent())
                         .build();
 

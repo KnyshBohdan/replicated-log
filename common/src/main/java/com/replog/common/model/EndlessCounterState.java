@@ -57,22 +57,16 @@ public class EndlessCounterState implements Comparable<EndlessCounterState> {
             return 0;
         }
 
-        double angleDiffThisToOther = (otherAngle - thisAngle + 360) % 360;
-        double angleDiffOtherToThis = (thisAngle - otherAngle + 360) % 360;
+        double angleDiffThisToOther = (thisAngle - otherAngle) % 360;
 
-        if (angleDiffThisToOther < angleDiffOtherToThis) {
-            return -1;
-        } else if (angleDiffOtherToThis < angleDiffThisToOther) {
-            return 1;
-        } else if (Math.abs(angleDiffOtherToThis - 180.0) < 0.001 &&
-                Math.abs(angleDiffThisToOther - 180.0) < 0.001) {
-            if(thisAngle < 180){
-                return -1;
-            }
+        if (Math.abs(angleDiffThisToOther) < 0.01){
+            return 0;
+        }
+        else if(angleDiffThisToOther > 0.0){
             return 1;
         }
-        else {
-            return 0;
+        else{
+            return -1;
         }
     }
 }

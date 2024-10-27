@@ -54,17 +54,18 @@ public class EndlessCounterTest {
             counter.increment(state1); // 90°, 135°, 180°, 225°
         }
 
-        Assertions.assertTrue(state2.compareTo(state1) < 0); // 225 > 45: because in 180 degree
-        Assertions.assertTrue(state1.compareTo(state2) > 0); // 225 < 45
+        Assertions.assertTrue(state2.compareTo(state1) < 0); // 225 > 45
+        Assertions.assertTrue(state1.compareTo(state2) > 0);
 
-        counter.increment(state1); // 270°
+        for (int i = 0; i < 2; i++) {
+            counter.increment(state1); // 270°, 315°
+        }
 
-        Assertions.assertTrue(state2.compareTo(state1) > 0); // 275 < 45: because -45 < 0
+        Assertions.assertTrue(state1.compareTo(state2) > 0); // 315 > 45
 
-        counter.increment(state2); // 90°
-        counter.increment(state2); // 135°
+        counter.increment(state1); // 0°
 
-        Assertions.assertTrue(state2.compareTo(state1) < 0); // 275 > 135
+        Assertions.assertTrue(state2.compareTo(state1) > 0); // 0 < 45
     }
 
     @Test
@@ -76,5 +77,23 @@ public class EndlessCounterTest {
         counterDefault.increment(state1);
         Assertions.assertEquals("10°", state1.getAngleStr());
         Assertions.assertTrue(state1.compareTo(state2) > 0);
+    }
+
+    @Test
+    public void testMaxNumber() {
+        double angularVelocity = 0.1;
+        EndlessCounter counterDefault = new EndlessCounter(1.0, angularVelocity);
+        EndlessCounterState state1 = new EndlessCounterState();
+        EndlessCounterState state2 = new EndlessCounterState();
+
+        double maxNumberUniqueIDs = 360/angularVelocity; // 3600
+
+        for(int i = 0; i < maxNumberUniqueIDs - 1; i++) {
+            counterDefault.increment(state1);
+        }
+
+        Assertions.assertTrue(state1.compareTo(state2) > 0); // still bigger
+        counterDefault.increment(state1); // reach 0°
+        Assertions.assertEquals(0, state1.compareTo(state2));
     }
 }

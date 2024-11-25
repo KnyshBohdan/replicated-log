@@ -5,6 +5,7 @@ import com.replog.common.model.EndlessCounterState;
 import com.replog.common.model.Message;
 import com.replog.common.model.MessageBuffer;
 import com.replog.master.model.InputMessage;
+import com.replog.common.model.Heartbeat;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
@@ -34,6 +35,8 @@ public class MessageController {
     private final String masterID = generateUniqueID();
     private final EndlessCounter endlessCounter = new EndlessCounter();
     private final EndlessCounterState endlessCounterState = new EndlessCounterState();
+
+    private final List<MessageProto.Heartbeat> heartbeats = new ArrayList<>();
 
     public MessageController(SecondaryServerDiscovery secondaryServerDiscovery) {
         this.messageSender = new MessageSender(secondaryServerDiscovery, masterID);
@@ -78,6 +81,13 @@ public class MessageController {
         }
         replay = replay + "============================ \n";
         return replay;
+    }
+
+    @PostMapping("/health")
+    public ResponseEntity<String> receiveHealth(@RequestBody Heartbeat heartbeat) {
+        logger.info("Received Heartbeat from SlaveID: {}", heartbeat.getSlaveID());
+        // Process the heartbeat
+        return ResponseEntity.ok("Heartbeat received.\n");
     }
 
     private String generateUniqueID() {

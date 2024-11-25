@@ -29,4 +29,5 @@ message Ack {
 
 service MessageService {
   rpc ReplicateMessage(Message) returns (Ack);
+  rpc SendHeartbeat(Heartbeat) returns (Ack);
 }

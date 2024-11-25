@@ -4,8 +4,11 @@ services:
     build:
       context: ./master
       dockerfile: Dockerfile
+    environment:
+      - grpc.port=50050
     ports:
-      - "8080:8080"
+      - "50050:50050"  # gRPC port
+      - "8080:8080"    # HTTP port
     depends_on:
       - secondary1
       - secondary2
@@ -20,9 +23,11 @@ services:
       dockerfile: Dockerfile
     environment:
       - grpc.port=50051
+      - master.host=master
+      - master.port=8080
     ports:
       - "50051:50051"
-      - "8081:8080"  # If you need HTTP access
+      - "8081:8080"
     networks:
       replog-network:
         aliases:
@@ -34,9 +39,11 @@ services:
       dockerfile: Dockerfile
     environment:
       - grpc.port=50052
+      - master.host=master
+      - master.port=8080
     ports:
       - "50052:50052"
-      - "8082:8080"  # If you need HTTP access
+      - "8082:8080"
     networks:
       replog-network:
         aliases:

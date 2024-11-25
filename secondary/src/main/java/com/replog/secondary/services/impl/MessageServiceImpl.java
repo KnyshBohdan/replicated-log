@@ -54,4 +54,22 @@ public class MessageServiceImpl extends MessageServiceGrpc.MessageServiceImplBas
         responseObserver.onNext(ack);
         responseObserver.onCompleted();
     }
+
+    @Override
+    public void sendHeartbeat(MessageProto.Heartbeat request, StreamObserver<MessageProto.Ack> responseObserver) {
+        logger.info("Received Heartbeat from SlaveID: {}", request.getSlaveID());
+
+        // Process the heartbeat as needed (e.g., update server status, log, etc.)
+
+        // Prepare acknowledgment
+        MessageProto.Ack ack = MessageProto.Ack.newBuilder()
+                .setSlaveID(request.getSlaveID())
+                .setMasterTimestamp(System.nanoTime())
+                .setSuccess(true)
+                .build();
+
+        // Send acknowledgment
+        responseObserver.onNext(ack);
+        responseObserver.onCompleted();
+    }
 }

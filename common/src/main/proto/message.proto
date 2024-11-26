@@ -8,7 +8,8 @@ option java_outer_classname = "MessageProto";
 message Heartbeat {
   string slaveID = 1;            // unique identifier of slave (length 6)
   int64 slaveTimestamp = 2;      // data from nanoTime
-  string status = 3;             // status, e.g., "WORKING"
+  string slaveGRPCHost = 3;      // for the identification of the slave (TODO: can be made only with slaveID, but in this situation I will make simple solution)
+  string status = 4;             // status, e.g., "WORKING"
 }
 
 message Message {

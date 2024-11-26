@@ -27,6 +27,7 @@ public class HealthSender {
 
     private final SecondaryServerConfig config;
     private final String masterHost;
+    private final String slaveGRPCHost;
     private final int masterHttpPort;
 
     private final RestTemplate restTemplate;
@@ -35,11 +36,13 @@ public class HealthSender {
     public HealthSender(
             SecondaryServerConfig config,
             @Value("${master.host}") String masterHost,
-            @Value("${master.port}") int masterHttpPort) {
+            @Value("${master.port}") int masterHttpPort,
+            @Value("${grpc.host}") String slaveGRPCHost) {
 
         this.config = config;
         this.masterHost = masterHost;
         this.masterHttpPort = masterHttpPort;
+        this.slaveGRPCHost = slaveGRPCHost;
         this.restTemplate = new RestTemplate();
     }
 
@@ -55,6 +58,7 @@ public class HealthSender {
             Heartbeat heartbeat = new Heartbeat();
             heartbeat.setSlaveID(config.getSlaveID());
             heartbeat.setSlaveTimestamp(slaveTimestamp);
+            heartbeat.setSlaveGRPCHost(slaveGRPCHost);
             heartbeat.setStatus(status);
 
             ResponseEntity<String> response = restTemplate.postForEntity(url, heartbeat, String.class);

@@ -27,6 +27,10 @@ public class MessageSender {
         this.executorService = Executors.newCachedThreadPool();
     }
 
+    public SecondaryServerDiscovery getSecondaryServerDiscovery() {
+        return secondaryServerDiscovery;
+    }
+
     public List<String> replicateToSecondaries(Integer writeConcern, Message message) {
         logger.info("Replicating message to secondaries: {}", message.getContent());
 
@@ -80,6 +84,7 @@ public class MessageSender {
         private final long masterTimestamp;
 
         public SendingThread(SecondaryServer secondaryServer, Message message, String masterID, long masterTimestamp) {
+            System.out.println("Sending to server with health status: " + secondaryServer.getSecondaryHealthStatus());
             this.secondaryServer = secondaryServer;
             this.message = message;
             this.masterID = masterID;

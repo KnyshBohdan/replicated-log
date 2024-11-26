@@ -6,6 +6,7 @@ import com.replog.common.model.Message;
 import com.replog.common.model.MessageBuffer;
 import com.replog.master.model.InputMessage;
 import com.replog.common.model.Heartbeat;
+import com.replog.master.controller.SecondaryHealthController;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
@@ -30,6 +31,7 @@ public class MessageController {
 
     private final MessageBuffer messagesBuffer = new MessageBuffer();
 
+    private final SecondaryHealthController healthController = new SecondaryHealthController();
     private final MessageSender messageSender;
 
     private final String masterID = generateUniqueID();
@@ -85,8 +87,9 @@ public class MessageController {
 
     @PostMapping("/health")
     public ResponseEntity<String> receiveHealth(@RequestBody Heartbeat heartbeat) {
-        logger.info("Received Heartbeat from SlaveID: {}", heartbeat.getSlaveID());
-        // Process the heartbeat
+        logger.info("Received Heartbeat from Host: {}", heartbeat.getSlaveGRPCHost());
+        healthController.process(heartbeat);
+        messageSender.getSecondaryServerDiscovery().getSecondaryServers().updateSecondaryHealthStatuses(healthController.getHealthStatuses());
         return ResponseEntity.ok("Heartbeat received.\n");
     }
 

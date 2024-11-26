@@ -23,6 +23,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - grpc.port=50051
+      - grpc.host=secondary1
       - master.host=master
       - master.port=8080
     ports:
@@ -39,6 +40,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - grpc.port=50052
+      - grpc.host=secondary2
       - master.host=master
       - master.port=8080
     ports:

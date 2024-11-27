@@ -11,6 +11,11 @@ public class Message {
         this.endlessCounterState = new EndlessCounterState();
     }
 
+    public Message(Message other) {
+        this.content = other.getContent();
+        this.endlessCounterState = other.getEndlessCounterState();
+    }
+
     public String getContent() {
         return content;
     }

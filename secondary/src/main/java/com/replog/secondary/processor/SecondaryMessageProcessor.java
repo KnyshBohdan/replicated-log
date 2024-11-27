@@ -30,11 +30,20 @@ public class SecondaryMessageProcessor {
 
         StringBuilder replay = new StringBuilder("Secondary processed messages: \n");
         int counter = 1;
+        replay.append("Size of the buffer: ").append(messageBuffer.getSize()).append("\n");
 
-        for (Message protoMessage : messageBuffer.getMessages()) {
-            replay.append(counter).append(": ").append(protoMessage.getContent()).append("\n");
-            counter += 1;
+        if (messageBuffer != null && messageBuffer.getMessages() != null) {
+            for (Message protoMessage : messageBuffer.getMessages()) {
+                if (protoMessage != null) {
+                    replay.append(counter).append(": ").append(protoMessage.getContent()).append("\n");
+                    counter += 1;
+                }
+                else{
+                    logger.info("Some messages are null in GET");
+                }
+            }
         }
+
         replay.append("============================ \n");
         return replay.toString();
     }

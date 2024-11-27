@@ -59,7 +59,8 @@ public class MessageBufferTest {
         buffer.add(msg1);
 
         List<Message> msgs = buffer.getMessages();
-        Assertions.assertEquals(4, msgs.size());
+        Assertions.assertEquals(1, msgs.size());
+        Assertions.assertEquals(4, buffer.getSize());
 
         buffer.add(msg3);
         buffer.add(msg2);

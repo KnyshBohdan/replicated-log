@@ -4,8 +4,11 @@ import com.replog.common.model.Message;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
+import com.replog.master.model.SecondaryHealthStatus;
 import com.replog.proto.MessageProto;
 import com.replog.proto.MessageServiceGrpc;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.grpc.ManagedChannel;
@@ -38,10 +41,12 @@ public class MessageSender {
         long masterTimestamp = System.nanoTime();
 
         SecondaryServers secondaryServers = secondaryServerDiscovery.getSecondaryServers();
-        List<Future<String>> futures = new ArrayList<>();
+        ExecutorCompletionService<String> completionService = new ExecutorCompletionService<>(executorService);
+        int taskCount = 0;
         for (SecondaryServer secondaryServer : secondaryServers.getServers()) {
-            SendingThread sendingThread = new SendingThread(secondaryServer, message, masterID, masterTimestamp);
-            futures.add(executorService.submit(sendingThread));
+            SendingThread sendingThread = new SendingThread(secondaryServer, new Message(message), masterID, masterTimestamp);
+            completionService.submit(sendingThread);
+            taskCount++;
         }
 
         List<String> failedServers = new ArrayList<>();
@@ -51,7 +56,8 @@ public class MessageSender {
         } else if (writeConcern == 2) {
             // wait for only one, fastest replication
             try {
-                String result = futures.get(0).get();
+                Future<String> future = completionService.take(); // waits for first completed task
+                String result = future.get();
                 if (result != null) {
                     failedServers.add(result);
                 }
@@ -61,8 +67,9 @@ public class MessageSender {
             logger.info("Replication to fastest secondary completed");
         } else if (writeConcern == 3) {
             // wait for all replications
-            for (Future<String> future : futures) {
+            for (int i = 0; i < taskCount; i++) {
                 try {
+                    Future<String> future = completionService.take();
                     String result = future.get();
                     if (result != null) {
                         failedServers.add(result);
@@ -93,36 +100,96 @@ public class MessageSender {
 
         @Override
         public String call() {
-            ManagedChannel channel = ManagedChannelBuilder.forAddress(secondaryServer.getHost(), secondaryServer.getPort())
-                    .usePlaintext()
-                    .build();
-
-            try {
-                MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(channel);
-
-                MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
-                        .setMasterID(masterID)
-                        .setMasterTimestamp(masterTimestamp)
-                        .setMsgIDReal(message.getEndlessCounterState().getReal())
-                        .setMsgIDImg(message.getEndlessCounterState().getImaginary())
-                        .setContent(message.getContent())
-                        .build();
-
-                MessageProto.Ack ack = stub.replicateMessage(grpcMessage);
-
-                if (ack.getSuccess()) {
-                    logger.info("Received ACK from secondary at {}:{}", secondaryServer.getHost(), secondaryServer.getPort());
-                    return null;
-                } else {
-                    logger.warn("Secondary at {}:{} failed to replicate message", secondaryServer.getHost(), secondaryServer.getPort());
-                    return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+            int retryCount = 0;
+            int maxRetries = 200; // adjust as needed
+            while (retryCount < maxRetries) {
+                SecondaryHealthStatus healthStatus = secondaryServer.getSecondaryHealthStatus();
+                if (healthStatus == SecondaryHealthStatus.POOR) {
+                    // wait until health improves
+                    try {
+                        logger.info("Secondary server at {}:{} is in POOR health. Waiting...",
+                                secondaryServer.getHost(), secondaryServer.getPort());
+                        Thread.sleep(500); // wait for 1 second before checking again
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        logger.error("Thread interrupted while waiting for secondary health to improve", e);
+                        return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+                    }
+                    continue;
                 }
-            } catch (Exception e) {
-                logger.error("Error during replication to secondary at {}:{}", secondaryServer.getHost(), secondaryServer.getPort(), e);
-                return secondaryServer.getHost() + ":" + secondaryServer.getPort();
-            } finally {
-                channel.shutdown();
+
+                ManagedChannel channel = null;
+                try {
+                    channel = ManagedChannelBuilder.forAddress(secondaryServer.getHost(), secondaryServer.getPort())
+                            .usePlaintext()
+                            .build();
+
+                    MessageServiceGrpc.MessageServiceBlockingStub stub = MessageServiceGrpc.newBlockingStub(channel);
+
+                    // set a deadline
+                    stub = stub.withDeadlineAfter(6, TimeUnit.SECONDS);
+
+                    MessageProto.Message grpcMessage = MessageProto.Message.newBuilder()
+                            .setMasterID(masterID)
+                            .setMasterTimestamp(masterTimestamp)
+                            .setMsgIDReal(message.getEndlessCounterState().getReal())
+                            .setMsgIDImg(message.getEndlessCounterState().getImaginary())
+                            .setContent(message.getContent())
+                            .build();
+
+                    MessageProto.Ack ack = stub.replicateMessage(grpcMessage);
+
+                    if (ack.getSuccess()) {
+                        logger.info("Received ACK from secondary at {}:{}",
+                                secondaryServer.getHost(), secondaryServer.getPort());
+                        return null; // Success
+                    } else {
+                        logger.warn("Secondary at {}:{} failed to replicate message",
+                                secondaryServer.getHost(), secondaryServer.getPort());
+                        // handle the failure based on health status
+                        if (healthStatus == SecondaryHealthStatus.GOOD) {
+                            retryCount++;
+                            logger.info("Retrying to replicate message to secondary at {}:{} (attempt {}/{})",
+                                    secondaryServer.getHost(), secondaryServer.getPort(), retryCount, maxRetries);
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                logger.error("Thread interrupted during sleep between retries", ie);
+                                return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+                            }
+                            continue;
+                        } else {
+                            return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+                        }
+                    }
+                } catch (StatusRuntimeException e) {
+                    logger.error("Status exception during replication to secondary at {}:{}",
+                            secondaryServer.getHost(), secondaryServer.getPort(), e);
+                    // interpret specific gRPC status codes if needed
+                    if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
+                        logger.info("Simulated packet loss detected.");
+                        continue;
+                    } else {
+                        // handle other exceptions
+                        logger.error("Unhandled exception status: {}", e.getStatus());
+                        return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+                    }
+                } catch (Exception e) {
+                    logger.error("Error during replication to secondary at {}:{}",
+                            secondaryServer.getHost(), secondaryServer.getPort(), e);
+                    // handle other exceptions
+                    return secondaryServer.getHost() + ":" + secondaryServer.getPort();
+                } finally {
+                    if (channel != null) {
+                        channel.shutdown();
+                    }
+                }
             }
+            // retries exhausted
+            logger.warn("Retries exhausted for secondary at {}:{}",
+                    secondaryServer.getHost(), secondaryServer.getPort());
+            return secondaryServer.getHost() + ":" + secondaryServer.getPort();
         }
     }
 }

@@ -15,8 +15,19 @@ public class MessageBuffer {
         this.endlessCounter = new EndlessCounter();
     }
 
+    public int getSize(){
+        return this.messages.size();
+    }
+
     public List<Message> getMessages() {
-        return Collections.unmodifiableList(messages);
+        List<Message> result = new ArrayList<>();
+        for (Message message : messages) {
+            if (message == null) {
+                break;
+            }
+            result.add(message);
+        }
+        return Collections.unmodifiableList(result);
     }
 
     public void add(Message message) {

@@ -1,5 +1,6 @@
 package com.replog.common.model;
 
+import com.replog.common.counter.EndlessCounter;
 import java.util.Comparator;
 import java.util.Collections;
 import java.util.ArrayList;
@@ -7,28 +8,48 @@ import java.util.List;
 
 public class MessageBuffer {
     private List<Message> messages;
+    private EndlessCounter endlessCounter;
+
     public MessageBuffer() {
         this.messages = new ArrayList<Message>();
+        this.endlessCounter = new EndlessCounter();
     }
 
-    public List<Message> getMessages(){
-        return Collections.unmodifiableList(messages);
+    public int getSize(){
+        return this.messages.size();
+    }
+
+    public List<Message> getMessages() {
+        List<Message> result = new ArrayList<>();
+        for (Message message : messages) {
+            if (message == null) {
+                break;
+            }
+            result.add(message);
+        }
+        return Collections.unmodifiableList(result);
     }
 
     public void add(Message message) {
-        Comparator<Message> messageComparator = new Comparator<Message>() {
-            @Override
-            public int compare(Message m1, Message m2) {
-                return m1.getEndlessCounterState().compareTo(m2.getEndlessCounterState());
+        // Just bruteforce implementation, can be make much faster
+        EndlessCounterState messageState = message.getEndlessCounterState();
+        EndlessCounterState currentState = new EndlessCounterState();
+
+        int index = 0;
+        while (currentState.compareTo(messageState) < 0) {
+            if (index < messages.size()) {
+                index++;
+            } else {
+                messages.add(index, null);
+                index++;
             }
-        };
-
-        int index = Collections.binarySearch(this.messages, message, messageComparator);
-
-        if (index < 0) {
-            index = -index - 1;
+            endlessCounter.increment(currentState);
         }
 
-        this.messages.add(index, message);
+        if (index < messages.size()) {
+            messages.set(index, message);
+        } else {
+            messages.add(index, message);
+        }
     }
 }

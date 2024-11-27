@@ -5,6 +5,8 @@ import com.replog.common.model.EndlessCounterState;
 import com.replog.common.model.Message;
 import com.replog.common.model.MessageBuffer;
 import com.replog.master.model.InputMessage;
+import com.replog.common.model.Heartbeat;
+import com.replog.master.controller.SecondaryHealthController;
 import com.replog.master.discovery.SecondaryServerDiscovery;
 import com.replog.master.model.SecondaryServer;
 import com.replog.master.model.SecondaryServers;
@@ -29,11 +31,14 @@ public class MessageController {
 
     private final MessageBuffer messagesBuffer = new MessageBuffer();
 
+    private final SecondaryHealthController healthController = new SecondaryHealthController();
     private final MessageSender messageSender;
 
     private final String masterID = generateUniqueID();
     private final EndlessCounter endlessCounter = new EndlessCounter();
     private final EndlessCounterState endlessCounterState = new EndlessCounterState();
+
+    private final List<MessageProto.Heartbeat> heartbeats = new ArrayList<>();
 
     public MessageController(SecondaryServerDiscovery secondaryServerDiscovery) {
         this.messageSender = new MessageSender(secondaryServerDiscovery, masterID);
@@ -43,19 +48,25 @@ public class MessageController {
     public ResponseEntity<String> addMessage(@RequestBody InputMessage message) {
         logger.info("Received POST request with message: {}", message.getContent());
 
-        // increment the EndlessCounterState for new message IDs
-        synchronized (endlessCounterState) {
-            endlessCounter.increment(endlessCounterState);
+        if(message.getWriteConcern() != 1 && message.getWriteConcern() != 2 && message.getWriteConcern() != 3){
+            logger.info("Wrong write concern");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Wrong write concern \n");
         }
 
         Message newMessage = new Message(message.getContent());
         EndlessCounterState msgCounterState = new EndlessCounterState(endlessCounterState);
         newMessage.setEndlessCounterState(msgCounterState);
 
+        // increment the EndlessCounterState for new message IDs
+        synchronized (endlessCounterState) {
+            endlessCounter.increment(endlessCounterState);
+        }
+
         List<String> failedServers = messageSender.replicateToSecondaries(message.getWriteConcern(), newMessage);
 
         if (failedServers.isEmpty()) {
-            messagesBuffer.add(newMessage);
+            messagesBuffer.add(new Message(newMessage));
+
             return ResponseEntity.ok("Message received and replicated successfully.\n");
         } else {
             logger.error("Failed to replicate message to the following secondary servers: {}", failedServers);
@@ -69,15 +80,32 @@ public class MessageController {
     public String getMessages() {
         logger.info("Received GET request for all messages");
 
-        String replay = "Master processed messages: \n";
+        StringBuilder replay = new StringBuilder("Secondary processed messages: \n");
         int counter = 1;
+        replay.append("Size of the buffer: ").append(messagesBuffer.getSize()).append("\n");
 
-        for (Message protoMessage : messagesBuffer.getMessages()) {
-            replay = replay + counter + ": " + protoMessage.getContent() + "\n";
-            counter += 1;
+        if (messagesBuffer != null && messagesBuffer.getMessages() != null) {
+            for (Message protoMessage : messagesBuffer.getMessages()) {
+                if (protoMessage != null) {
+                    replay.append(counter).append(": ").append(protoMessage.getContent()).append("\n");
+                    counter += 1;
+                }
+                else{
+                    logger.info("Some messages are null in GET");
+                }
+            }
         }
-        replay = replay + "============================ \n";
-        return replay;
+
+        replay.append("============================ \n");
+        return replay.toString();
+    }
+
+    @PostMapping("/health")
+    public ResponseEntity<String> receiveHealth(@RequestBody Heartbeat heartbeat) {
+        logger.info("Received Heartbeat from Host: {}", heartbeat.getSlaveGRPCHost());
+        healthController.process(heartbeat);
+        messageSender.getSecondaryServerDiscovery().getSecondaryServers().updateSecondaryHealthStatuses(healthController.getHealthStatuses());
+        return ResponseEntity.ok("Heartbeat received.\n");
     }
 
     private String generateUniqueID() {

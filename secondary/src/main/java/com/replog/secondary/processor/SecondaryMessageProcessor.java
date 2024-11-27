@@ -28,15 +28,24 @@ public class SecondaryMessageProcessor {
     public String getMessages() {
         logger.info("Received GET request for all messages");
 
-        String replay = "Secondary processed messages: \n";
+        StringBuilder replay = new StringBuilder("Secondary processed messages: \n");
         int counter = 1;
+        replay.append("Size of the buffer: ").append(messageBuffer.getSize()).append("\n");
 
-        for (Message protoMessage : messageBuffer.getMessages()) {
-            replay = replay + counter + ": " + protoMessage.getContent() + "\n";
-            counter += 1;
+        if (messageBuffer != null && messageBuffer.getMessages() != null) {
+            for (Message protoMessage : messageBuffer.getMessages()) {
+                if (protoMessage != null) {
+                    replay.append(counter).append(": ").append(protoMessage.getContent()).append("\n");
+                    counter += 1;
+                }
+                else{
+                    logger.info("Some messages are null in GET");
+                }
+            }
         }
-        replay = replay + "============================ \n";
-        return replay;
+
+        replay.append("============================ \n");
+        return replay.toString();
     }
 
     public void addMessage(MessageProto.Message message) {
@@ -49,22 +58,5 @@ public class SecondaryMessageProcessor {
         newMessage.setEndlessCounterState(counterState);
 
         messageBuffer.add(newMessage);
-    }
-
-    @GetMapping(value = "/health", produces = MediaType.APPLICATION_JSON_VALUE)
-    public MessageProto.Heartbeat getHealth() {
-        logger.info("Received GET request for health");
-
-        long slaveTimestamp = System.nanoTime();
-        String status = "WORKING";
-
-        // Build the Heartbeat message
-        MessageProto.Heartbeat heartbeat = MessageProto.Heartbeat.newBuilder()
-                .setSlaveID(config.getSlaveID())
-                .setSlaveTimestamp(slaveTimestamp)
-                .setStatus(status)
-                .build();
-
-        return heartbeat;
     }
 }

@@ -33,7 +33,6 @@ public class MessageBufferTest {
         msg2.setEndlessCounterState(state2);
 
         counter.increment(state);
-        counter.increment(state);
 
         String content3 = "Third";
         Message msg3 = new Message(content3);
@@ -55,18 +54,25 @@ public class MessageBufferTest {
         msg5.setEndlessCounterState(state5);
 
         MessageBuffer buffer = new MessageBuffer();
+
         buffer.add(msg4);
         buffer.add(msg1);
+
+        List<Message> msgs = buffer.getMessages();
+        Assertions.assertEquals(1, msgs.size());
+        Assertions.assertEquals(4, buffer.getSize());
+
         buffer.add(msg3);
         buffer.add(msg2);
         buffer.add(msg5);
 
-        List<Message> msgs = buffer.getMessages();
+        msgs = buffer.getMessages();
 
         Assertions.assertEquals("First", msgs.get(0).getContent());
         Assertions.assertEquals("Second", msgs.get(1).getContent());
         Assertions.assertEquals("Third", msgs.get(2).getContent());
         Assertions.assertEquals("Fourth", msgs.get(3).getContent());
         Assertions.assertEquals("Fifth", msgs.get(4).getContent());
+        Assertions.assertEquals(5, msgs.size());
     }
 }

@@ -11,6 +11,9 @@ and the GRPC protocol is used for efficient message transfer between the compone
 - GRPC protocol for efficient message transfer between components
 - Customizable delay for simulating message processing time
 - Write concern parameters and asynchronous messages sending 
+- Sending the heartbeat from Secondary to Master
+- Based on Secondary health categorized into: [GOOD, FAIR, POOR].
+- Resend messages if sending takes too long or fails
 
 ## Build
 
@@ -96,6 +99,7 @@ curl http://localhost:8080/messages
 Output:
 ```shell
 Master processed messages: 
+Size of the buffer: 3
 1: 0 Hello, World!
 2: 1 Hello, World!
 3: 2 Hello, World!
@@ -112,6 +116,7 @@ curl http://localhost:8081/messages
 Output:
 ```shell
 Secondary processed messages: 
+Size of the buffer: 3
 1: 0 Hello, World!
 2: 1 Hello, World!
 3: 2 Hello, World!

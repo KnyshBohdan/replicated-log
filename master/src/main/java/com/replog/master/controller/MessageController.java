@@ -57,15 +57,15 @@ public class MessageController {
         EndlessCounterState msgCounterState = new EndlessCounterState(endlessCounterState);
         newMessage.setEndlessCounterState(msgCounterState);
 
+        // increment the EndlessCounterState for new message IDs
+        synchronized (endlessCounterState) {
+            endlessCounter.increment(endlessCounterState);
+        }
+
         List<String> failedServers = messageSender.replicateToSecondaries(message.getWriteConcern(), newMessage);
 
         if (failedServers.isEmpty()) {
             messagesBuffer.add(new Message(newMessage));
-
-            // increment the EndlessCounterState for new message IDs
-            synchronized (endlessCounterState) {
-                endlessCounter.increment(endlessCounterState);
-            }
 
             return ResponseEntity.ok("Message received and replicated successfully.\n");
         } else {
